@@ -799,9 +799,10 @@ function buildHistory() {
   rosterHistory.forEach((entry, idx) => {
     const letters = LETTERS.slice(0, entry.playerCount);
     const rosterLines = letters.map(l => '<b>' + l + ':</b> ' + (entry.roster[l] || 'Player ' + l)).join(' &nbsp; ');
+    const pCount = entry.periodCount || 9;
     html += '<div class="history-entry">' +
       '<div class="history-header">' +
-        '<span class="history-date">' + entry.date + '<span class="history-players-label">' + entry.playerCount + ' players</span></span>' +
+        '<span class="history-date">' + entry.date + '<span class="history-players-label">' + entry.playerCount + ' players · ' + pCount + ' periods</span></span>' +
         '<button class="history-delete" onclick="deleteHistoryEntry(' + idx + ')">Delete</button>' +
       '</div>' +
       '<div class="history-roster">' + rosterLines + '</div>' +
