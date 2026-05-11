@@ -654,7 +654,35 @@ function calcPlayerMins(n, q) {
   return mins;
 }
 
+let summaryMode = 'game';
+
+function toggleSummaryMode() {
+  summaryMode = summaryMode === 'game' ? 'accumulated' : 'game';
+  buildSummary();
+}
+
 function buildSummary() {
+  const el = document.getElementById('summary');
+  const hasHistory = rosterHistory.length > 0;
+
+  let html = '';
+  if (hasHistory) {
+    html += '<div style="text-align:center;margin-bottom:8px;">' +
+      '<button class="rotate-btn" onclick="toggleSummaryMode()" style="font-size:0.85rem;padding:6px 14px;">' +
+      (summaryMode === 'game' ? 'Show Accumulated' : 'Show This Game') +
+      '</button></div>';
+  }
+
+  if (summaryMode === 'game' || !hasHistory) {
+    html += buildGameSummary();
+  } else {
+    html += buildAccumulated();
+  }
+
+  el.innerHTML = html;
+}
+
+function buildGameSummary() {
   const n = activeTab;
   const q = parseInt(document.getElementById('qlen').value);
   const playerMins = calcPlayerMins(n, q);
@@ -664,8 +692,7 @@ function buildSummary() {
   let maxMins = Math.max(...playerMins);
   let checkSum = playerMins.reduce((a, b) => a + b, 0);
 
-  let html = '<h3 style="color:#ff9f43;font-size:0.95rem;text-align:center;margin-bottom:6px;">This Game</h3>';
-  html += '<div class="summary-grid">';
+  let html = '<div class="summary-grid">';
   for (let i = 0; i < n; i++) {
     const pct = maxMins > 0 ? (playerMins[i] / maxMins * 100) : 0;
     const periodsPlayed = periods.length - bench.filter(b => b.includes(i)).length;
@@ -677,10 +704,7 @@ function buildSummary() {
   }
   html += '</div>';
   html += '<div class="total-check">Total player-minutes: ' + fmtMinsSec(checkSum) + ' / ' + fmtMinsSec(totalGameMins) + ' game-minutes</div>';
-
-  html += buildAccumulated();
-
-  document.getElementById('summary').innerHTML = html;
+  return html;
 }
 
 function buildAccumulated() {
