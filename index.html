@@ -313,19 +313,27 @@ td.period-info {
 <body>
 
 <h1>Basketball Subs</h1>
-<div class="tabs" id="tabs"></div>
 
-<div class="config-row">
-  <label for="qlen">Quarter length:</label>
-  <select id="qlen">
-    <option value="8">8 min</option>
-    <option value="10" selected>10 min</option>
-    <option value="12">12 min</option>
-  </select>
-</div>
-<div class="config-row">
-  <button class="rotate-btn" onclick="rotatePlayers()">Rotate</button>
-  <button class="start-btn" onclick="archiveRoster()">Start</button>
+<div class="collapsible" id="settings-section">
+  <div class="collapsible-header" onclick="toggleSection('settings-section')">
+    <span class="collapsible-arrow">&#9660;</span>
+    <h2>Settings</h2>
+  </div>
+  <div class="collapsible-body">
+    <div class="tabs" id="tabs"></div>
+    <div class="config-row">
+      <label for="qlen">Quarter length:</label>
+      <select id="qlen">
+        <option value="8">8 min</option>
+        <option value="10" selected>10 min</option>
+        <option value="12">12 min</option>
+      </select>
+    </div>
+    <div class="config-row">
+      <button class="rotate-btn" onclick="rotatePlayers()">Rotate</button>
+      <button class="start-btn" onclick="archiveRoster()">Start</button>
+    </div>
+  </div>
 </div>
 
 <div class="collapsible" id="players-section">
