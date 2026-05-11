@@ -308,6 +308,20 @@ td.period-info {
   font-size: 0.9rem;
   padding: 20px;
 }
+.summary-toggle {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.summary-toggle .rotate-btn {
+  font-size: 0.85rem;
+  padding: 6px 14px;
+}
+.summary-subtitle {
+  color: #ff9f43;
+  font-size: 0.95rem;
+  text-align: center;
+  margin: 14px 0 6px;
+}
 </style>
 </head>
 <body>
@@ -385,6 +399,12 @@ const BENCH_SCHEDULES = {
     8: [[5], [4], [3], [2], [1], [0], [5], [4]]
   }
 };
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
 
 function getStore() {
   try { return JSON.parse(window.name || '{}'); } catch(e) { return {}; }
@@ -494,7 +514,7 @@ function switchPeriods(p) {
 function switchTab(n) {
   activeTab = n;
   saveData('bball_activeTab', n);
-  document.querySelectorAll('.tab').forEach((t, i) => {
+  document.querySelectorAll('#tabs .tab').forEach((t, i) => {
     t.classList.toggle('active', [6,7,8][i] === n);
   });
   buildAll();
@@ -511,7 +531,7 @@ function buildInputs() {
   const el = document.getElementById('players');
   const letters = LETTERS.slice(0, activeTab);
   el.innerHTML = '<div class="players-grid">' + letters.map(l => {
-    const saved = names[l] || ('Player ' + l);
+    const saved = esc(names[l] || ('Player ' + l));
     return `<div class="player-row" data-letter="${l}"
       ontouchstart="onDragStart(event,'${l}')"
       onmousedown="onDragStart(event,'${l}')">
@@ -530,7 +550,7 @@ function onName(input) {
 
 function getName(idx) {
   const l = LETTERS[idx];
-  return names[l] || ('Player ' + l);
+  return esc(names[l] || ('Player ' + l));
 }
 
 /* ---- Drag and Drop ---- */
@@ -642,11 +662,6 @@ function fmtTime(mins) {
   return m + ':' + String(s).padStart(2, '0');
 }
 
-function fmtMinsSec(totalMins) {
-  const m = Math.floor(totalMins);
-  const s = Math.round((totalMins - m) * 60);
-  return m + ':' + String(s).padStart(2, '0');
-}
 
 function buildTable() {
   const n = activeTab;
@@ -716,8 +731,8 @@ function buildSummary() {
 
   let html = '';
   if (hasHistory) {
-    html += '<div style="text-align:center;margin-bottom:8px;">' +
-      '<button class="rotate-btn" onclick="toggleSummaryMode()" style="font-size:0.85rem;padding:6px 14px;">' +
+    html += '<div class="summary-toggle">' +
+      '<button class="rotate-btn" onclick="toggleSummaryMode()">' +
       (summaryMode === 'game' ? 'Show Accumulated' : 'Show This Game') +
       '</button></div>';
   }
@@ -748,11 +763,11 @@ function buildGameSummary() {
     html += '<div class="summary-row">' +
       '<span class="summary-name">' + getName(i) + '</span>' +
       '<div class="summary-bar-wrap"><div class="summary-bar" style="width:' + pct + '%"></div></div>' +
-      '<span class="summary-mins">' + fmtMinsSec(playerMins[i]) + ' (' + periodsPlayed + ' periods)</span>' +
+      '<span class="summary-mins">' + fmtTime(playerMins[i]) + ' (' + periodsPlayed + ' periods)</span>' +
       '</div>';
   }
   html += '</div>';
-  html += '<div class="total-check">Total player-minutes: ' + fmtMinsSec(checkSum) + ' / ' + fmtMinsSec(totalGameMins) + ' game-minutes</div>';
+  html += '<div class="total-check">Total player-minutes: ' + fmtTime(checkSum) + ' / ' + fmtTime(totalGameMins) + ' game-minutes</div>';
   return html;
 }
 
@@ -767,7 +782,7 @@ function buildAccumulated() {
     const mins = calcPlayerMins(n, q, p);
     const letters = LETTERS.slice(0, n);
     letters.forEach((l, i) => {
-      const name = entry.roster[l] || ('Player ' + l);
+      const name = esc(entry.roster[l] || ('Player ' + l));
       totals[name] = (totals[name] || 0) + mins[i];
     });
   });
@@ -775,14 +790,14 @@ function buildAccumulated() {
   const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
   const maxMins = sorted[0][1];
 
-  let html = '<h3 style="color:#ff9f43;font-size:0.95rem;text-align:center;margin:14px 0 6px;">Accumulated (' + rosterHistory.length + ' game' + (rosterHistory.length > 1 ? 's' : '') + ')</h3>';
+  let html = '<h3 class="summary-subtitle">Accumulated (' + rosterHistory.length + ' game' + (rosterHistory.length > 1 ? 's' : '') + ')</h3>';
   html += '<div class="summary-grid">';
   sorted.forEach(([name, mins]) => {
     const pct = maxMins > 0 ? (mins / maxMins * 100) : 0;
     html += '<div class="summary-row">' +
       '<span class="summary-name">' + name + '</span>' +
       '<div class="summary-bar-wrap"><div class="summary-bar" style="width:' + pct + '%"></div></div>' +
-      '<span class="summary-mins">' + fmtMinsSec(mins) + '</span>' +
+      '<span class="summary-mins">' + fmtTime(mins) + '</span>' +
       '</div>';
   });
   html += '</div>';
@@ -798,7 +813,7 @@ function buildHistory() {
   let html = '<div class="history-grid">';
   rosterHistory.forEach((entry, idx) => {
     const letters = LETTERS.slice(0, entry.playerCount);
-    const rosterLines = letters.map(l => '<b>' + l + ':</b> ' + (entry.roster[l] || 'Player ' + l)).join(' &nbsp; ');
+    const rosterLines = letters.map(l => '<b>' + l + ':</b> ' + esc(entry.roster[l] || 'Player ' + l)).join(' &nbsp; ');
     const pCount = entry.periodCount || 9;
     html += '<div class="history-entry">' +
       '<div class="history-header">' +
