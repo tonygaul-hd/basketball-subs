@@ -321,6 +321,7 @@ td.period-info {
   </div>
   <div class="collapsible-body">
     <div class="tabs" id="tabs"></div>
+    <div class="tabs" id="period-tabs"></div>
     <div class="config-row">
       <label for="qlen">Quarter length:</label>
       <select id="qlen">
@@ -363,15 +364,18 @@ td.period-info {
 const LETTERS = ['A','B','C','D','E','F','G','H'];
 
 const BENCH_SCHEDULES = {
-  8: [
-    [5,6,7], [2,3,4], [0,1,7], [4,5,6], [1,2,3], [0,6,7], [3,4,5], [0,1,2], [5,6,7]
-  ],
-  7: [
-    [5,6], [3,4], [1,2], [0,6], [4,5], [2,3], [0,1], [5,6], [3,4]
-  ],
-  6: [
-    [5], [4], [3], [2], [1], [0], [5], [4], [3]
-  ]
+  8: {
+    9: [[5,6,7], [2,3,4], [0,1,7], [4,5,6], [1,2,3], [0,6,7], [3,4,5], [0,1,2], [5,6,7]],
+    8: [[5,6,7], [2,3,4], [0,1,7], [4,5,6], [1,2,3], [0,6,7], [3,4,5], [0,1,2]]
+  },
+  7: {
+    9: [[5,6], [3,4], [1,2], [0,6], [4,5], [2,3], [0,1], [5,6], [3,4]],
+    8: [[5,6], [3,4], [1,2], [0,6], [4,5], [2,3], [0,1], [5,6]]
+  },
+  6: {
+    9: [[5], [4], [3], [2], [1], [0], [5], [4], [3]],
+    8: [[5], [4], [3], [2], [1], [0], [5], [4]]
+  }
 };
 
 function getStore() {
@@ -390,6 +394,7 @@ function toggleSection(id) {
 }
 
 let activeTab = parseInt(loadData('bball_activeTab')) || 8;
+let activePeriods = parseInt(loadData('bball_activePeriods')) || 9;
 let names = JSON.parse(loadData('bball_names') || '{}');
 let rosterHistory = JSON.parse(loadData('bball_history') || '[]');
 
@@ -401,6 +406,14 @@ function init() {
     btn.textContent = n + ' Players';
     btn.onclick = () => switchTab(n);
     tabsEl.appendChild(btn);
+  });
+  const periodTabsEl = document.getElementById('period-tabs');
+  [8,9].forEach(p => {
+    const btn = document.createElement('div');
+    btn.className = 'tab' + (p === activePeriods ? ' active' : '');
+    btn.textContent = p + ' Periods';
+    btn.onclick = () => switchPeriods(p);
+    periodTabsEl.appendChild(btn);
   });
   const savedQlen = loadData('bball_qlen');
   if (savedQlen) document.getElementById('qlen').value = savedQlen;
@@ -447,7 +460,8 @@ function archiveRoster() {
     date: dateStr + ' ' + timeStr,
     roster: roster,
     playerCount: activeTab,
-    quarterLength: parseInt(document.getElementById('qlen').value)
+    quarterLength: parseInt(document.getElementById('qlen').value),
+    periodCount: activePeriods
   });
   saveData('bball_history', JSON.stringify(rosterHistory));
   buildHistory();
@@ -458,6 +472,15 @@ function deleteHistoryEntry(idx) {
   rosterHistory.splice(idx, 1);
   saveData('bball_history', JSON.stringify(rosterHistory));
   buildHistory();
+}
+
+function switchPeriods(p) {
+  activePeriods = p;
+  saveData('bball_activePeriods', p);
+  document.querySelectorAll('#period-tabs .tab').forEach((t, i) => {
+    t.classList.toggle('active', [8,9][i] === p);
+  });
+  buildAll();
 }
 
 function switchTab(n) {
@@ -579,6 +602,18 @@ function onDragEnd() {
 function getPeriods() {
   const q = parseInt(document.getElementById('qlen').value);
   const half = q / 2;
+  if (activePeriods === 8) {
+    return [
+      { quarter: 'Q1', from: q, to: half, mins: half },
+      { quarter: 'Q1', from: half, to: 0, mins: half },
+      { quarter: 'Q2', from: q, to: half, mins: half },
+      { quarter: 'Q2', from: half, to: 0, mins: half },
+      { quarter: 'Q3', from: q, to: half, mins: half },
+      { quarter: 'Q3', from: half, to: 0, mins: half },
+      { quarter: 'Q4', from: q, to: half, mins: half },
+      { quarter: 'Q4', from: half, to: 0, mins: half },
+    ];
+  }
   const third = q / 3;
   return [
     { quarter: 'Q1', from: q, to: half, mins: half },
@@ -607,7 +642,7 @@ function fmtMinsSec(totalMins) {
 
 function buildTable() {
   const n = activeTab;
-  const bench = BENCH_SCHEDULES[n];
+  const bench = BENCH_SCHEDULES[n][activePeriods];
   const periods = getPeriods();
   const letters = LETTERS.slice(0, n);
 
@@ -633,8 +668,14 @@ function buildTable() {
   table.querySelector('tbody').innerHTML = bodyHtml;
 }
 
-function getPeriodsForQ(q) {
+function getPeriodsForQ(q, numPeriods) {
   const half = q / 2;
+  if (numPeriods === 8) {
+    return [
+      { mins: half }, { mins: half }, { mins: half }, { mins: half },
+      { mins: half }, { mins: half }, { mins: half }, { mins: half }
+    ];
+  }
   const third = q / 3;
   return [
     { mins: half }, { mins: half }, { mins: half }, { mins: half },
@@ -642,9 +683,9 @@ function getPeriodsForQ(q) {
   ];
 }
 
-function calcPlayerMins(n, q) {
-  const bench = BENCH_SCHEDULES[n];
-  const periods = getPeriodsForQ(q);
+function calcPlayerMins(n, q, numPeriods) {
+  const bench = BENCH_SCHEDULES[n][numPeriods];
+  const periods = getPeriodsForQ(q, numPeriods);
   const mins = [];
   for (let i = 0; i < n; i++) {
     let total = 0;
@@ -685,9 +726,9 @@ function buildSummary() {
 function buildGameSummary() {
   const n = activeTab;
   const q = parseInt(document.getElementById('qlen').value);
-  const playerMins = calcPlayerMins(n, q);
+  const playerMins = calcPlayerMins(n, q, activePeriods);
   const totalGameMins = q * 4 * 5;
-  const bench = BENCH_SCHEDULES[n];
+  const bench = BENCH_SCHEDULES[n][activePeriods];
   const periods = getPeriods();
   let maxMins = Math.max(...playerMins);
   let checkSum = playerMins.reduce((a, b) => a + b, 0);
@@ -714,7 +755,8 @@ function buildAccumulated() {
   rosterHistory.forEach(entry => {
     const n = entry.playerCount;
     const q = entry.quarterLength || 10;
-    const mins = calcPlayerMins(n, q);
+    const p = entry.periodCount || 9;
+    const mins = calcPlayerMins(n, q, p);
     const letters = LETTERS.slice(0, n);
     letters.forEach((l, i) => {
       const name = entry.roster[l] || ('Player ' + l);
