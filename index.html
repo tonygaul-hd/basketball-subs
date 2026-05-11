@@ -16,6 +16,10 @@ body {
   min-height: 100vh;
   padding: 12px;
 }
+body.no-scroll {
+  overflow: hidden;
+  touch-action: none;
+}
 h1 {
   text-align: center;
   font-size: 1.4rem;
@@ -44,16 +48,15 @@ h1 {
   color: #1a1a2e;
   border-color: #ff9f43;
 }
-.config {
+.config-row {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
+  margin-bottom: 10px;
 }
-.config label { font-size: 0.95rem; color: #ccc; }
-.config select {
+.config-row label { font-size: 0.95rem; color: #ccc; }
+.config-row select {
   padding: 8px 12px;
   border-radius: 6px;
   border: 1px solid #444;
@@ -75,6 +78,21 @@ h1 {
 .rotate-btn:hover {
   background: #ff9f43;
   color: #1a1a2e;
+}
+.start-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 2px solid #e74c3c;
+  background: #e74c3c;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.start-btn:hover {
+  background: #c0392b;
+  border-color: #c0392b;
 }
 .collapsible {
   margin-bottom: 12px;
@@ -119,6 +137,21 @@ h1 {
   display: flex;
   align-items: center;
   gap: 8px;
+  transition: opacity 0.2s;
+  position: relative;
+}
+.player-row.dragging {
+  opacity: 0.4;
+}
+.player-row.drag-target::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #ff9f43;
+  border-radius: 2px;
 }
 .player-label {
   width: 28px;
@@ -188,19 +221,11 @@ td.period-info {
   font-weight: 400;
   font-size: 0.8rem;
 }
-.summary {
-  max-width: 600px;
-  margin: 0 auto;
-}
-.summary h2 {
-  font-size: 1.1rem;
-  color: #ff9f43;
-  margin-bottom: 8px;
-  text-align: center;
-}
 .summary-grid {
   display: grid;
   gap: 6px;
+  max-width: 600px;
+  margin: 0 auto;
 }
 .summary-row {
   display: flex;
@@ -232,6 +257,57 @@ td.period-info {
   font-size: 0.85rem;
   color: #888;
 }
+.history-grid {
+  display: grid;
+  gap: 8px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.history-entry {
+  background: #16213e;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.history-date {
+  font-weight: 700;
+  color: #ff9f43;
+  font-size: 0.95rem;
+}
+.history-players-label {
+  font-size: 0.8rem;
+  color: #888;
+  margin-left: 8px;
+}
+.history-delete {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #e74c3c;
+  background: transparent;
+  color: #e74c3c;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.history-delete:hover {
+  background: #e74c3c;
+  color: #fff;
+}
+.history-roster {
+  font-size: 0.85rem;
+  color: #ccc;
+  line-height: 1.6;
+}
+.history-empty {
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+  padding: 20px;
+}
 </style>
 </head>
 <body>
@@ -239,14 +315,17 @@ td.period-info {
 <h1>Basketball Subs</h1>
 <div class="tabs" id="tabs"></div>
 
-<div class="config">
+<div class="config-row">
   <label for="qlen">Quarter length:</label>
   <select id="qlen">
     <option value="8">8 min</option>
     <option value="10" selected>10 min</option>
     <option value="12">12 min</option>
   </select>
+</div>
+<div class="config-row">
   <button class="rotate-btn" onclick="rotatePlayers()">Rotate</button>
+  <button class="start-btn" onclick="archiveRoster()">Start</button>
 </div>
 
 <div class="collapsible" id="players-section">
@@ -263,6 +342,13 @@ td.period-info {
     <h2>Playing Time</h2>
   </div>
   <div class="collapsible-body" id="summary"></div>
+</div>
+<div class="collapsible collapsed" id="history-section">
+  <div class="collapsible-header" onclick="toggleSection('history-section')">
+    <span class="collapsible-arrow">&#9660;</span>
+    <h2>History</h2>
+  </div>
+  <div class="collapsible-body" id="history"></div>
 </div>
 
 <script>
@@ -297,6 +383,7 @@ function toggleSection(id) {
 
 let activeTab = parseInt(loadData('bball_activeTab')) || 8;
 let names = JSON.parse(loadData('bball_names') || '{}');
+let rosterHistory = JSON.parse(loadData('bball_history') || '[]');
 
 function init() {
   const tabsEl = document.getElementById('tabs');
@@ -314,6 +401,10 @@ function init() {
     saveData('bball_qlen', document.getElementById('qlen').value);
     buildAll();
   });
+  document.addEventListener('touchmove', onDragMove, { passive: false });
+  document.addEventListener('touchend', onDragEnd);
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', onDragEnd);
 }
 
 function rotatePlayers() {
@@ -321,12 +412,43 @@ function rotatePlayers() {
   const letters = LETTERS.slice(0, n);
   const shift = 3;
   const oldNames = letters.map(l => names[l] || ('Player ' + l));
-  letters.forEach((l, i) => {
-    const fromIdx = (i - shift + n) % n;
-    names[l] = oldNames[fromIdx];
-  });
+  const newNames = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const dest = i < n - shift ? i + shift : n - 1 - i;
+    newNames[dest] = oldNames[i];
+  }
+  letters.forEach((l, i) => { names[l] = newNames[i]; });
   saveData('bball_names', JSON.stringify(names));
   buildAll();
+}
+
+function archiveRoster() {
+  const letters = LETTERS.slice(0, activeTab);
+  const roster = {};
+  letters.forEach(l => { roster[l] = names[l] || ('Player ' + l); });
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-AU', {
+    day: '2-digit', month: 'short', year: 'numeric'
+  });
+  const timeStr = now.toLocaleTimeString('en-AU', {
+    hour: '2-digit', minute: '2-digit', hour12: true
+  });
+
+  rosterHistory.unshift({
+    date: dateStr + ' ' + timeStr,
+    roster: roster,
+    playerCount: activeTab
+  });
+  saveData('bball_history', JSON.stringify(rosterHistory));
+  buildHistory();
+  document.getElementById('history-section').classList.remove('collapsed');
+}
+
+function deleteHistoryEntry(idx) {
+  rosterHistory.splice(idx, 1);
+  saveData('bball_history', JSON.stringify(rosterHistory));
+  buildHistory();
 }
 
 function switchTab(n) {
@@ -342,6 +464,7 @@ function buildAll() {
   buildInputs();
   buildTable();
   buildSummary();
+  buildHistory();
 }
 
 function buildInputs() {
@@ -349,7 +472,9 @@ function buildInputs() {
   const letters = LETTERS.slice(0, activeTab);
   el.innerHTML = '<div class="players-grid">' + letters.map(l => {
     const saved = names[l] || ('Player ' + l);
-    return `<div class="player-row">
+    return `<div class="player-row" data-letter="${l}"
+      ontouchstart="onDragStart(event,'${l}')"
+      onmousedown="onDragStart(event,'${l}')">
       <span class="player-label">${l}</span>
       <input class="player-input" data-letter="${l}" value="${saved}" oninput="onName(this)">
     </div>`;
@@ -367,6 +492,80 @@ function getName(idx) {
   const l = LETTERS[idx];
   return names[l] || ('Player ' + l);
 }
+
+/* ---- Drag and Drop ---- */
+let drag = null;
+
+function onDragStart(e, letter) {
+  const isTouch = e.type === 'touchstart';
+  const y = isTouch ? e.touches[0].clientY : e.clientY;
+  drag = {
+    letter: letter,
+    startY: y,
+    active: false,
+    targetLetter: null,
+    holdTimer: setTimeout(() => {
+      if (!drag || drag.letter !== letter) return;
+      drag.active = true;
+      const row = document.querySelector('.player-row[data-letter="' + letter + '"]');
+      if (row) row.classList.add('dragging');
+      document.body.classList.add('no-scroll');
+      if (document.activeElement) document.activeElement.blur();
+    }, 400)
+  };
+}
+
+function onDragMove(e) {
+  if (!drag) return;
+  const isTouch = e.type === 'touchmove';
+  const y = isTouch ? e.touches[0].clientY : e.clientY;
+  if (!drag.active) {
+    if (Math.abs(y - drag.startY) > 8) {
+      clearTimeout(drag.holdTimer);
+      drag = null;
+    }
+    return;
+  }
+  e.preventDefault();
+  document.querySelectorAll('.player-row').forEach(r => r.classList.remove('drag-target'));
+  drag.targetLetter = null;
+  const rows = document.querySelectorAll('.player-row');
+  for (const row of rows) {
+    const rl = row.dataset.letter;
+    if (rl === drag.letter) continue;
+    const rect = row.getBoundingClientRect();
+    if (y >= rect.top && y <= rect.bottom) {
+      row.classList.add('drag-target');
+      drag.targetLetter = rl;
+      break;
+    }
+  }
+}
+
+function onDragEnd() {
+  if (!drag) return;
+  clearTimeout(drag.holdTimer);
+  const wasActive = drag.active;
+  const fromLetter = drag.letter;
+  const toLetter = drag.targetLetter;
+  document.querySelectorAll('.player-row').forEach(r => {
+    r.classList.remove('dragging', 'drag-target');
+  });
+  document.body.classList.remove('no-scroll');
+  drag = null;
+  if (wasActive && toLetter && fromLetter !== toLetter) {
+    const letters = LETTERS.slice(0, activeTab);
+    const currentNames = letters.map(l => names[l] || ('Player ' + l));
+    const fromIdx = letters.indexOf(fromLetter);
+    const toIdx = letters.indexOf(toLetter);
+    const [moved] = currentNames.splice(fromIdx, 1);
+    currentNames.splice(toIdx, 0, moved);
+    letters.forEach((l, i) => { names[l] = currentNames[i]; });
+    saveData('bball_names', JSON.stringify(names));
+    buildAll();
+  }
+}
+/* ---- End Drag and Drop ---- */
 
 function getPeriods() {
   const q = parseInt(document.getElementById('qlen').value);
@@ -404,21 +603,18 @@ function buildTable() {
   const letters = LETTERS.slice(0, n);
 
   let headHtml = '<tr><th>Qtr</th><th>Clock</th>';
-  letters.forEach(l => {
-    headHtml += `<th>${l}</th>`;
-  });
+  letters.forEach(l => { headHtml += '<th>' + l + '</th>'; });
   headHtml += '</tr>';
 
   let bodyHtml = '';
   periods.forEach((p, pi) => {
     const benchSet = new Set(bench[pi]);
     bodyHtml += '<tr>';
-    bodyHtml += `<td class="period-info">${p.quarter}</td>`;
-    bodyHtml += `<td class="period-info">${fmtTime(p.from)} - ${fmtTime(p.to)}</td>`;
+    bodyHtml += '<td class="period-info">' + p.quarter + '</td>';
+    bodyHtml += '<td class="period-info">' + fmtTime(p.from) + ' - ' + fmtTime(p.to) + '</td>';
     for (let i = 0; i < n; i++) {
       const onBench = benchSet.has(i);
-      const displayName = getName(i);
-      bodyHtml += `<td class="${onBench ? 'bench' : 'court'}">${displayName}</td>`;
+      bodyHtml += '<td class="' + (onBench ? 'bench' : 'court') + '">' + getName(i) + '</td>';
     }
     bodyHtml += '</tr>';
   });
@@ -452,16 +648,38 @@ function buildSummary() {
   for (let i = 0; i < n; i++) {
     const pct = maxMins > 0 ? (playerMins[i] / maxMins * 100) : 0;
     const periodsPlayed = periods.length - bench.filter(b => b.includes(i)).length;
-    html += `<div class="summary-row">
-      <span class="summary-name">${getName(i)}</span>
-      <div class="summary-bar-wrap"><div class="summary-bar" style="width:${pct}%"></div></div>
-      <span class="summary-mins">${fmtMinsSec(playerMins[i])} (${periodsPlayed} periods)</span>
-    </div>`;
+    html += '<div class="summary-row">' +
+      '<span class="summary-name">' + getName(i) + '</span>' +
+      '<div class="summary-bar-wrap"><div class="summary-bar" style="width:' + pct + '%"></div></div>' +
+      '<span class="summary-mins">' + fmtMinsSec(playerMins[i]) + ' (' + periodsPlayed + ' periods)</span>' +
+      '</div>';
   }
   html += '</div>';
-  html += `<div class="total-check">Total player-minutes: ${fmtMinsSec(checkSum)} / ${fmtMinsSec(totalGameMins)} game-minutes</div>`;
+  html += '<div class="total-check">Total player-minutes: ' + fmtMinsSec(checkSum) + ' / ' + fmtMinsSec(totalGameMins) + ' game-minutes</div>';
 
   document.getElementById('summary').innerHTML = html;
+}
+
+function buildHistory() {
+  const el = document.getElementById('history');
+  if (rosterHistory.length === 0) {
+    el.innerHTML = '<div class="history-empty">No history yet. Press Start to archive the current roster.</div>';
+    return;
+  }
+  let html = '<div class="history-grid">';
+  rosterHistory.forEach((entry, idx) => {
+    const letters = LETTERS.slice(0, entry.playerCount);
+    const rosterLines = letters.map(l => '<b>' + l + ':</b> ' + (entry.roster[l] || 'Player ' + l)).join(' &nbsp; ');
+    html += '<div class="history-entry">' +
+      '<div class="history-header">' +
+        '<span class="history-date">' + entry.date + '<span class="history-players-label">' + entry.playerCount + ' players</span></span>' +
+        '<button class="history-delete" onclick="deleteHistoryEntry(' + idx + ')">Delete</button>' +
+      '</div>' +
+      '<div class="history-roster">' + rosterLines + '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 init();
