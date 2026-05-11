@@ -378,11 +378,6 @@ td.period-info {
       <button class="rotate-btn" onclick="rotatePlayers()">Rotate</button>
       <button class="start-btn" onclick="archiveRoster()">Start</button>
     </div>
-    <div class="config-row">
-      <button class="export-btn" onclick="exportData()">Export</button>
-      <button class="import-btn" onclick="document.getElementById('import-file').click()">Import</button>
-      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
-    </div>
   </div>
 </div>
 
@@ -415,6 +410,19 @@ td.period-info {
     <h2>History</h2>
   </div>
   <div class="collapsible-body" id="history"></div>
+</div>
+<div class="collapsible collapsed" id="backup-section">
+  <div class="collapsible-header" onclick="toggleSection('backup-section')">
+    <span class="collapsible-arrow">&#9660;</span>
+    <h2>Back Up</h2>
+  </div>
+  <div class="collapsible-body">
+    <div class="config-row">
+      <button class="export-btn" onclick="exportData()">Export</button>
+      <button class="import-btn" onclick="document.getElementById('import-file').click()">Import</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+    </div>
+  </div>
 </div>
 
 <script>
