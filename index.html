@@ -308,6 +308,36 @@ td.period-info {
   font-size: 0.9rem;
   padding: 20px;
 }
+.export-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 2px solid #3498db;
+  background: #1a1a2e;
+  color: #3498db;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.export-btn:hover {
+  background: #3498db;
+  color: #1a1a2e;
+}
+.import-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 2px solid #2ecc71;
+  background: #1a1a2e;
+  color: #2ecc71;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.import-btn:hover {
+  background: #2ecc71;
+  color: #1a1a2e;
+}
 .summary-toggle {
   text-align: center;
   margin-bottom: 8px;
@@ -347,6 +377,11 @@ td.period-info {
     <div class="config-row">
       <button class="rotate-btn" onclick="rotatePlayers()">Rotate</button>
       <button class="start-btn" onclick="archiveRoster()">Start</button>
+    </div>
+    <div class="config-row">
+      <button class="export-btn" onclick="exportData()">Export</button>
+      <button class="import-btn" onclick="document.getElementById('import-file').click()">Import</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
     </div>
   </div>
 </div>
@@ -500,6 +535,72 @@ function deleteHistoryEntry(idx) {
   rosterHistory.splice(idx, 1);
   saveData('bball_history', JSON.stringify(rosterHistory));
   buildHistory();
+}
+
+function exportData() {
+  const data = {
+    playerCount: activeTab,
+    periodCount: activePeriods,
+    quarterLength: parseInt(document.getElementById('qlen').value),
+    players: {},
+    history: rosterHistory
+  };
+  const letters = LETTERS.slice(0, activeTab);
+  letters.forEach(l => { data.players[l] = names[l] || ('Player ' + l); });
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'basketball-subs.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.players || typeof data.players !== 'object') {
+        alert('Invalid file: missing player data.');
+        return;
+      }
+      if (data.playerCount && [6,7,8].includes(data.playerCount)) {
+        activeTab = data.playerCount;
+        saveData('bball_activeTab', activeTab);
+        document.querySelectorAll('#tabs .tab').forEach((t, i) => {
+          t.classList.toggle('active', [6,7,8][i] === activeTab);
+        });
+      }
+      if (data.periodCount && [8,9].includes(data.periodCount)) {
+        activePeriods = data.periodCount;
+        saveData('bball_activePeriods', activePeriods);
+        document.querySelectorAll('#period-tabs .tab').forEach((t, i) => {
+          t.classList.toggle('active', [8,9][i] === activePeriods);
+        });
+      }
+      if (data.quarterLength && [8,10,12].includes(data.quarterLength)) {
+        document.getElementById('qlen').value = data.quarterLength;
+        saveData('bball_qlen', data.quarterLength);
+      }
+      names = {};
+      Object.keys(data.players).forEach(l => { names[l] = data.players[l]; });
+      saveData('bball_names', JSON.stringify(names));
+      if (Array.isArray(data.history)) {
+        rosterHistory = data.history;
+        saveData('bball_history', JSON.stringify(rosterHistory));
+      }
+      summaryMode = 'game';
+      buildAll();
+    } catch(err) {
+      alert('Failed to import: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
 }
 
 function switchPeriods(p) {
