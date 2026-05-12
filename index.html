@@ -434,13 +434,31 @@ function esc(s) {
   return _escEl.innerHTML;
 }
 
+const _hasLS = (() => {
+  try { localStorage.setItem('_t', '1'); localStorage.removeItem('_t'); return true; }
+  catch(e) { return false; }
+})();
+(function migrate() {
+  if (!_hasLS || localStorage.getItem('bball')) return;
+  try {
+    const old = JSON.parse(window.name || '{}');
+    if (old.bball_names || old.bball_history) {
+      localStorage.setItem('bball', window.name);
+      window.name = '';
+    }
+  } catch(e) {}
+})();
 function getStore() {
-  try { return JSON.parse(window.name || '{}'); } catch(e) { return {}; }
+  try {
+    return JSON.parse((_hasLS ? localStorage.getItem('bball') : window.name) || '{}');
+  } catch(e) { return {}; }
 }
 function saveData(key, val) {
   const store = getStore();
   store[key] = val;
-  window.name = JSON.stringify(store);
+  const json = JSON.stringify(store);
+  if (_hasLS) localStorage.setItem('bball', json);
+  else window.name = json;
 }
 function loadData(key) {
   return getStore()[key] || null;
