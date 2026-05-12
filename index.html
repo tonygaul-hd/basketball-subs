@@ -560,7 +560,9 @@ function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'basketball-subs.json';
+  const d = new Date();
+  const ds = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  a.download = 'basketball-subs_' + ds + '.json';
   a.click();
   URL.revokeObjectURL(url);
 }
