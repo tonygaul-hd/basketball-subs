@@ -537,6 +537,10 @@ function archiveRoster() {
   saveData('bball_history', JSON.stringify(rosterHistory));
   buildHistory();
   document.getElementById('history-section').classList.remove('collapsed');
+
+  if (confirm('Back up settings?')) {
+    exportData();
+  }
 }
 
 function deleteHistoryEntry(idx) {
