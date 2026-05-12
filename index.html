@@ -506,7 +506,7 @@ function rotatePlayers() {
   const oldNames = letters.map(l => names[l] || ('Player ' + l));
   const newNames = new Array(n);
   for (let i = 0; i < n; i++) {
-    const dest = i < n - shift ? i + shift : n - 1 - i;
+    const dest = (i + shift) % n;
     newNames[dest] = oldNames[i];
   }
   letters.forEach((l, i) => { names[l] = newNames[i]; });
