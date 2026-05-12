@@ -308,36 +308,21 @@ td.period-info {
   font-size: 0.9rem;
   padding: 20px;
 }
-.export-btn {
+.backup-btn {
   padding: 8px 16px;
   border-radius: 6px;
-  border: 2px solid #3498db;
+  border: 2px solid;
   background: #1a1a2e;
-  color: #3498db;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
-.export-btn:hover {
-  background: #3498db;
-  color: #1a1a2e;
-}
-.import-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: 2px solid #2ecc71;
-  background: #1a1a2e;
-  color: #2ecc71;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.import-btn:hover {
-  background: #2ecc71;
-  color: #1a1a2e;
-}
+.backup-btn:hover { color: #1a1a2e; }
+.export-btn { border-color: #3498db; color: #3498db; }
+.export-btn:hover { background: #3498db; }
+.import-btn { border-color: #2ecc71; color: #2ecc71; }
+.import-btn:hover { background: #2ecc71; }
 .summary-toggle {
   text-align: center;
   margin-bottom: 8px;
@@ -418,8 +403,8 @@ td.period-info {
   </div>
   <div class="collapsible-body">
     <div class="config-row">
-      <button class="export-btn" onclick="exportData()">Export</button>
-      <button class="import-btn" onclick="document.getElementById('import-file').click()">Import</button>
+      <button class="backup-btn export-btn" onclick="exportData()">Export</button>
+      <button class="backup-btn import-btn" onclick="document.getElementById('import-file').click()">Import</button>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
     </div>
   </div>
@@ -443,10 +428,10 @@ const BENCH_SCHEDULES = {
   }
 };
 
+const _escEl = document.createElement('div');
 function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
+  _escEl.textContent = s;
+  return _escEl.innerHTML;
 }
 
 function getStore() {
@@ -547,6 +532,7 @@ function deleteHistoryEntry(idx) {
   rosterHistory.splice(idx, 1);
   saveData('bball_history', JSON.stringify(rosterHistory));
   buildHistory();
+  buildSummary();
 }
 
 function exportData() {
@@ -742,35 +728,30 @@ function onDragEnd() {
 }
 /* ---- End Drag and Drop ---- */
 
-function getPeriods() {
-  const q = parseInt(document.getElementById('qlen').value);
+function getPeriods(q, numPeriods) {
+  if (q === undefined) q = parseInt(document.getElementById('qlen').value);
+  if (numPeriods === undefined) numPeriods = activePeriods;
   const half = q / 2;
-  if (activePeriods === 8) {
-    return [
-      { quarter: 'Q1', from: q, to: half, mins: half },
-      { quarter: 'Q1', from: half, to: 0, mins: half },
-      { quarter: 'Q2', from: q, to: half, mins: half },
-      { quarter: 'Q2', from: half, to: 0, mins: half },
-      { quarter: 'Q3', from: q, to: half, mins: half },
-      { quarter: 'Q3', from: half, to: 0, mins: half },
-      { quarter: 'Q4', from: q, to: half, mins: half },
-      { quarter: 'Q4', from: half, to: 0, mins: half },
-    ];
+  const periods = [];
+  for (let i = 0; i < 6; i++) {
+    periods.push({
+      quarter: 'Q' + (Math.floor(i / 2) + 1),
+      from: i % 2 === 0 ? q : half,
+      to: i % 2 === 0 ? half : 0,
+      mins: half
+    });
   }
-  const third = q / 3;
-  return [
-    { quarter: 'Q1', from: q, to: half, mins: half },
-    { quarter: 'Q1', from: half, to: 0, mins: half },
-    { quarter: 'Q2', from: q, to: half, mins: half },
-    { quarter: 'Q2', from: half, to: 0, mins: half },
-    { quarter: 'Q3', from: q, to: half, mins: half },
-    { quarter: 'Q3', from: half, to: 0, mins: half },
-    { quarter: 'Q4', from: q, to: q - third, mins: third },
-    { quarter: 'Q4', from: q - third, to: q - third * 2, mins: third },
-    { quarter: 'Q4', from: q - third * 2, to: 0, mins: third },
-  ];
+  if (numPeriods === 8) {
+    periods.push({ quarter: 'Q4', from: q, to: half, mins: half });
+    periods.push({ quarter: 'Q4', from: half, to: 0, mins: half });
+  } else {
+    const third = q / 3;
+    periods.push({ quarter: 'Q4', from: q, to: q - third, mins: third });
+    periods.push({ quarter: 'Q4', from: q - third, to: q - third * 2, mins: third });
+    periods.push({ quarter: 'Q4', from: q - third * 2, to: 0, mins: third });
+  }
+  return periods;
 }
-
 function fmtTime(mins) {
   const m = Math.floor(mins);
   const s = Math.round((mins - m) * 60);
@@ -806,24 +787,9 @@ function buildTable() {
   table.querySelector('tbody').innerHTML = bodyHtml;
 }
 
-function getPeriodsForQ(q, numPeriods) {
-  const half = q / 2;
-  if (numPeriods === 8) {
-    return [
-      { mins: half }, { mins: half }, { mins: half }, { mins: half },
-      { mins: half }, { mins: half }, { mins: half }, { mins: half }
-    ];
-  }
-  const third = q / 3;
-  return [
-    { mins: half }, { mins: half }, { mins: half }, { mins: half },
-    { mins: half }, { mins: half }, { mins: third }, { mins: third }, { mins: third }
-  ];
-}
-
 function calcPlayerMins(n, q, numPeriods) {
   const bench = BENCH_SCHEDULES[n][numPeriods];
-  const periods = getPeriodsForQ(q, numPeriods);
+  const periods = getPeriods(q, numPeriods);
   const mins = [];
   for (let i = 0; i < n; i++) {
     let total = 0;
@@ -867,14 +833,13 @@ function buildGameSummary() {
   const playerMins = calcPlayerMins(n, q, activePeriods);
   const totalGameMins = q * 4 * 5;
   const bench = BENCH_SCHEDULES[n][activePeriods];
-  const periods = getPeriods();
   let maxMins = Math.max(...playerMins);
   let checkSum = playerMins.reduce((a, b) => a + b, 0);
 
   let html = '<div class="summary-grid">';
   for (let i = 0; i < n; i++) {
     const pct = maxMins > 0 ? (playerMins[i] / maxMins * 100) : 0;
-    const periodsPlayed = periods.length - bench.filter(b => b.includes(i)).length;
+    const periodsPlayed = bench.length - bench.filter(b => b.includes(i)).length;
     html += '<div class="summary-row">' +
       '<span class="summary-name">' + getName(i) + '</span>' +
       '<div class="summary-bar-wrap"><div class="summary-bar" style="width:' + pct + '%"></div></div>' +
